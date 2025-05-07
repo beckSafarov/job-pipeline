@@ -13,13 +13,13 @@ Additionally you will need to set an Airflow variable with
 the name `open_notify_api_endpoint` and the value `iss-now.json`.
 """
 
-from airflow.decorators import dag, task
-from airflow.models.baseoperator import chain
-from airflow.providers.http.operators.http import HttpOperator
-from airflow.providers.github.sensors.github import GithubSensor
-from airflow.exceptions import AirflowException
-from airflow.models import Variable
-from pendulum import datetime
+from airflow.decorators import dag, task  # type:ignore
+from airflow.models.baseoperator import chain  # type:ignore
+from airflow.providers.http.operators.http import HttpOperator  # type:ignore
+from airflow.providers.github.sensors.github import GithubSensor  # type:ignore
+from airflow.exceptions import AirflowException  # type:ignore
+from airflow.models import Variable  # type:ignore
+from pendulum import datetime  # type:ignore
 from typing import Any
 import logging
 
