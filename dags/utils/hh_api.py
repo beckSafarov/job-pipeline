@@ -23,10 +23,10 @@ def get_vacancies_by_page(page=1, role_id=10, country_id=97):
         return None
 
 
-def get_all_vacancies(country_id, role_id):
+def get_all_vacancies(country_id: int, role_id: int) -> list:
     # Get first page and initialize variables
     json_data = get_vacancies_by_page(1, role_id, country_id)
-    
+
     if not json_data:
         print("Error fetching data from API")
         return []
@@ -42,7 +42,7 @@ def get_all_vacancies(country_id, role_id):
     if pages > 1:
         for i in range(1, pages):
             more_jobs = get_vacancies_by_page(i + 1,role_id,country_id)
-            
+
             if more_jobs:
                 jobs.extend(more_jobs["items"])
             else:

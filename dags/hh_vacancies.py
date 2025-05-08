@@ -12,7 +12,8 @@ import time  # type: ignore
 from dags.utils.insert_to_db import insert_to_table
 from utils.common_utils import get_files_from_paths
 from utils.prep_to_db import prep_dict_lists, prep_nested_lists
-
+from data.data import roles
+from utils.db_utils import query_latest_vacancy
 
 @dag(
     start_date=datetime(2024, 1, 1),  # date after which the DAG can be scheduled
@@ -32,6 +33,11 @@ from utils.prep_to_db import prep_dict_lists, prep_nested_lists
 def hh_vacancies():
 
     @task
+    def fetch_latest_publication():
+        latest_vacancy = query_latest_vacancy()
+        return latest_vacancy
+
+    @task
     def fetch_basic_vacancies(**context) -> list[dict]:
         """
         This task uses the requests library to retrieve a list of vacancies
@@ -46,7 +52,12 @@ def hh_vacancies():
         Returns:
             list[dict]: A list of vacancies currently available at HH.
         """
-        all_vacancies = get_all_vacancies(97, 36)
+        role_ids = [role["id"] for role in roles]
+        all_vacancies = []
+        for role_id in role_ids:
+            vacs_for_curr_role = get_all_vacancies(97, role_id)
+            all_vacancies.extend(vacs_for_curr_role)
+
         file_path = "/tmp/vacancies.json"
         with open(file_path, "w") as f:
             json.dump(all_vacancies, f)
@@ -141,11 +152,12 @@ def hh_vacancies():
             print(table)
             print('\n')
 
-    path_to_vacancies_file = fetch_basic_vacancies()
-    path_to_detailed_vacancies_file = fetch_detailed_vacancies(path_to_vacancies_file)
-    paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
-    print_tables(paths_to_tables)
-    load_to_db(paths_to_tables)
+    # path_to_vacancies_file = fetch_basic_vacancies()
+    # path_to_detailed_vacancies_file = fetch_detailed_vacancies(path_to_vacancies_file)
+    # paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
+    fetch_latest_publication()
+    # print_tables(paths_to_tables)
+    # load_to_db(paths_to_tables)
     # if len(paths_to_tables > 1):
     # print_jobs(paths_to_tables)
 

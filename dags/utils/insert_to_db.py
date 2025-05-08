@@ -1,6 +1,5 @@
 from models.index import Job,Employer,Address,Salary,JobLanguage,JobRole,JobSkill
-from sqlalchemy.orm import sessionmaker #type:ignore
-from utils.get_db_engine import get_db_engine
+from utils.db_utils import create_session
 
 models_lookup = {
     "Employer": Employer,
@@ -14,12 +13,6 @@ models_lookup = {
 
 def is_invalid_item(item):
     return type(item) is not dict or len(list(item.keys())) < 1
-
-
-def create_session():
-    engine = get_db_engine()
-    Session = sessionmaker(bind=engine)
-    return Session()
 
 
 def insert_to_table(model_name: str, data: list) -> list:

@@ -12,7 +12,7 @@ from sqlalchemy import (  #type: ignore
 )
 from sqlalchemy.orm import relationship #type:ignore
 from sqlalchemy.ext.declarative import declarative_base #type:ignore
-from utils.get_db_engine import get_db_engine
+from utils.db_utils import get_db_engine
 
 Base = declarative_base()
 
