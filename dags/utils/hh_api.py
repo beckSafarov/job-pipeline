@@ -1,23 +1,22 @@
 import requests # type: ignore
 import time
-from utils.cache_utils import get_cached_response,cache_response
+# from utils.cache_utils import get_cached_response,cache_response
 API = "https://api.hh.ru/vacancies"
 
 
 def get_vacancies_by_page(page=1, role_id=10, country_id=97):
     url = f"{API}?area={country_id}&professional_role={role_id}"
     url = url if page <= 1 else url + f"&page={page}"
-    params = {"area": country_id, "professional_role": role_id}
+    # params = {"area": country_id, "professional_role": role_id}
+    # cached_response = get_cached_response(API, params)
+    # if cached_response is not None:
+    #     return cached_response
 
-    cached_response = get_cached_response(API, params)
-    if cached_response is not None:
-        return cached_response
-
-    print(f"does cached response exist for basic vacancies: {bool(cached_response)}")
+    # print(f"does cached response exist for basic vacancies: {bool(cached_response)}")
     try:
         r = requests.get(url)
         data = r.json()
-        cache_response(data, API, params)
+        # cache_response(data, API, params)
         return data
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data from API: {e}")
@@ -56,15 +55,15 @@ def get_all_vacancies(country_id, role_id):
 
 def get_vacancy_details(vacancy_id):
     url = f"{API}/{vacancy_id}"
-    cached_response = get_cached_response(url)
-    if cached_response is not None:
-        return cached_response
+    # cached_response = get_cached_response(url)
+    # if cached_response is not None:
+    #     return cached_response
 
-    print(f"does cached response exist for vacancy details: {bool(cached_response)}")
+    # print(f"does cached response exist for vacancy details: {bool(cached_response)}")
     try:
         r = requests.get(url)
         data = r.json()
-        cache_response(data, url)
+        # cache_response(data, url)
         return data
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data from API: {e}")

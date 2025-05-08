@@ -22,7 +22,7 @@ def create_session():
     return Session()
 
 
-def insert_to_table_2(model_name: str, data: list) -> list:
+def insert_to_table(model_name: str, data: list) -> list:
     if data is None:
         print(f"No data for {model_name}")
         return []
@@ -93,35 +93,5 @@ def insert_to_table_2(model_name: str, data: list) -> list:
     except Exception as e:
         session.rollback()
         raise e
-    finally:
-        session.close()
-
-
-def insert_to_table(model_name: str, data: list) -> list:
-    if len(data) < 1:
-        return []
-
-    engine = get_db_engine()
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    record_ids = []
-    model_class = models_lookup[model_name]
-
-    try:
-        for item in data:
-            if is_invalid_item(item):
-                continue
-            record = model_class(**item)
-            session.add(record)
-            session.flush()  # Ensures record.id is generated
-            record_ids.append(record.id)
-
-        session.commit()
-        return record_ids
-
-    except Exception as e:
-        session.rollback()
-        raise e
-
     finally:
         session.close()

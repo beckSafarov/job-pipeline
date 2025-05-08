@@ -9,19 +9,11 @@ from utils.cache_utils import get_cached_response
 # import requests # type: ignore
 import json 
 import time  # type: ignore
-from dags.utils.insert_to_db import insert_to_table, insert_to_table_2
+from dags.utils.insert_to_db import insert_to_table
 from utils.common_utils import get_files_from_paths
 from utils.prep_to_db import prep_dict_lists, prep_nested_lists
 
-# from models.index import Job
 
-
-# -------------- #
-# DAG Definition #
-# -------------- #
-
-
-# instantiate a DAG with the @dag decorator and set DAG parameters (see: https://www.astronomer.io/docs/learn/airflow-dag-parameters)
 @dag(
     start_date=datetime(2024, 1, 1),  # date after which the DAG can be scheduled
     schedule="@daily",  # see: https://www.astronomer.io/docs/learn/scheduling-in-airflow for options
@@ -58,14 +50,6 @@ def hh_vacancies():
         file_path = "/tmp/vacancies.json"
         with open(file_path, "w") as f:
             json.dump(all_vacancies, f)
-
-        url = f"https://api.hh.ru/vacancies?area=97&professional_role=10"
-        params = {"area": 97, "professional_role": 10}
-        cached_response = get_cached_response(url,params)
-
-        print(
-            f"does cached response exist for basic vacancies: {bool(cached_response)}"
-        )
         return file_path
 
     @task
@@ -76,7 +60,6 @@ def hh_vacancies():
         for vacancy in vacancies:   
             vacancy_id = vacancy["id"]
             vacancy_details = get_vacancy_details(vacancy_id)
-            print(vacancy_details)
             if vacancy_details:
                 vacancy["description"] = vacancy_details.get("description", "")
                 vacancy["key_skills"] = vacancy_details.get("key_skills", [])
@@ -107,7 +90,6 @@ def hh_vacancies():
             paths.append(table_path)
             with open(table_path, "w") as f:
                 json.dump(tables[table_name], f)
-        print(paths)
         return paths
 
     @task
@@ -120,29 +102,26 @@ def hh_vacancies():
             get_files_from_paths(paths)
         )
 
-        insert_to_table_2("Employer", employers)
-        job_ids = insert_to_table_2("Job", jobs)
-        # print("some split tables below")
-        # print(salaries)
-        # print(job_languages)
+        insert_to_table("Employer", employers)
+        job_ids = insert_to_table("Job", jobs)
         salaries_with_ids = prep_dict_lists(job_ids, salaries)
         addresses_with_ids = prep_dict_lists(job_ids, addresses)
         job_roles_with_ids = prep_nested_lists(job_ids, job_roles)
         job_skills_with_ids = prep_nested_lists(job_ids, job_skills)
         job_languages_with_ids = prep_nested_lists(job_ids, job_languages)
 
-        print("some tables with ids below")
-        insert_to_table_2("Address", addresses_with_ids)
-        print(salaries_with_ids)
-        insert_to_table_2("Salary", salaries_with_ids)
-        print(job_languages_with_ids)
-        insert_to_table_2("JobLanguage", job_languages_with_ids)
-        print(job_roles_with_ids)
-        insert_to_table_2("JobRole", job_roles_with_ids)
-        print(job_skills_with_ids)
-        insert_to_table_2("JobSkill", job_skills_with_ids)
+        # print("some tables with ids below")
+        insert_to_table("Address", addresses_with_ids)
+        # print(salaries_with_ids)
+        insert_to_table("Salary", salaries_with_ids)
+        # print(job_languages_with_ids)
+        insert_to_table("JobLanguage", job_languages_with_ids)
+        # print(job_roles_with_ids)
+        insert_to_table("JobRole", job_roles_with_ids)
+        # print(job_skills_with_ids)
+        insert_to_table("JobSkill", job_skills_with_ids)
 
-        print(f"Inserted {len(job_ids)} jobs.")
+        # print(f"Inserted {len(job_ids)} jobs.")
         return None
 
     @task 
