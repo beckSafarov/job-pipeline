@@ -1,17 +1,3 @@
-"""
-## HH vacancies retrieval DAG
-
-This DAG retrieves the current number of vacancies at HH and prints it to the logs.
-It uses the `requests` library to make an API call to the HH API and
-returns the number of vacancies as a JSON response. The DAG is scheduled to run
-daily and uses the `pendulum` library to set the start date and duration of the DAG.
-The DAG is decorated with the `@dag` decorator and the tasks are defined using
-the `@task` decorator. The DAG is tagged with "example" and "space" for easy
-searching in the Airflow UI. The DAG is set to not catch up on previous runs
-and is paused upon creation. The DAG is also set to auto-pause after 5 consecutive
-failed runs, which is an experimental feature. The DAG is set to run with a
-"""
-
 from airflow.decorators import (  # type:ignore
     dag,
     task,
@@ -23,8 +9,10 @@ from utils.cache_utils import get_cached_response
 # import requests # type: ignore
 import json 
 import time  # type: ignore
-from dags.utils.insert_to_db import insert_jobs,insert_employers,insert_to_table,map_ids_to_values
-from utils.get_json import get_files_from_paths
+from dags.utils.insert_to_db import insert_to_table, insert_to_table_2
+from utils.common_utils import get_files_from_paths
+from utils.prep_to_db import prep_dict_lists, prep_nested_lists
+
 # from models.index import Job
 
 
@@ -128,36 +116,31 @@ def hh_vacancies():
             print("Paths is empty")
             return 
 
-        # jobs_path = paths[0]
-        # employers_path = paths[1]
-        # addresses = paths[2]
-        # salaries = paths[3]
-        # job_languages = paths[4]
-        # job_roles = paths[5]
-        # job_skills = paths[6]
+        jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
+            get_files_from_paths(paths)
+        )
 
-        # with open(jobs_path, "r") as f:
-        #     jobs_table = json.load(f)
-        # with open(employers_path, "r") as f:
-        #     employers_table = json.load(f)
-
-        jobs,employers,addresses,salaries,job_languages,job_roles,job_skills = get_files_from_paths(paths)
-
-        insert_to_table('Employer',employers)
-        job_ids = insert_to_table('Job',jobs)
-        # print('data below')
-        # print(addresses)
+        insert_to_table_2("Employer", employers)
+        job_ids = insert_to_table_2("Job", jobs)
+        # print("some split tables below")
         # print(salaries)
         # print(job_languages)
+        salaries_with_ids = prep_dict_lists(job_ids, salaries)
+        addresses_with_ids = prep_dict_lists(job_ids, addresses)
+        job_roles_with_ids = prep_nested_lists(job_ids, job_roles)
+        job_skills_with_ids = prep_nested_lists(job_ids, job_skills)
+        job_languages_with_ids = prep_nested_lists(job_ids, job_languages)
 
-        addresses_with_ids = map_ids_to_values(job_ids, addresses)
-        job_roles_with_job_id = map_ids_to_values(job_ids,job_roles)
-        job_skills_with_job_id = map_ids_to_values(job_ids,job_skills)
-        insert_to_table("Address", addresses)
-        insert_to_table("Salary", salaries)
-        insert_to_table("JobLanguage", job_languages)
-        insert_to_table('JobRole',job_roles_with_job_id)
-        insert_to_table('JobSkill',job_skills_with_job_id)
+        print("some tables with ids below")
+        insert_to_table_2("Address", addresses_with_ids)
+        print(salaries_with_ids)
+        insert_to_table_2("Salary", salaries_with_ids)
+        print(job_languages_with_ids)
+        insert_to_table_2("JobLanguage", job_languages_with_ids)
+        print(job_roles_with_ids)
+        insert_to_table_2("JobRole", job_roles_with_ids)
+        print(job_skills_with_ids)
+        insert_to_table_2("JobSkill", job_skills_with_ids)
 
         print(f"Inserted {len(job_ids)} jobs.")
         return None

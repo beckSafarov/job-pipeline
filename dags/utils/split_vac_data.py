@@ -1,14 +1,12 @@
-import json 
+def handle_work_format(formats: list) -> str:
+    if len(formats) < 1:
+        return formats
+    format_ids = [format["id"].lower() for format in formats]
 
+    if "on_site" in format_ids and "remote" in format_ids:
+        return "hybrid"
+    return format_ids[0]
 
-def handle_work_format(formats: list)->str:
-  if len(formats) < 1:
-    return formats
-  format_ids = [format['id'].lower() for format in formats]
-  
-  if 'on_site' in format_ids and 'remote' in format_ids:
-    return 'hybrid'
-  return format_ids[0]
 
 def handle_work_hours(hours: list)->str:
     if len(hours) < 1:
@@ -77,24 +75,24 @@ def split_vac_data(vacancies: list) -> None:
         salary_data = {}
         if vacancy['salary'] is not None:
             salary_data = {
-              "from": vacancy['salary']['from'],
-              "to": vacancy['salary']['to'],
-              "currency": vacancy['salary']['currency'],
-          }
+                "salary_from": vacancy["salary"]["from"],
+                "salary_to": vacancy["salary"]["to"],
+                "currency": vacancy["salary"]["currency"],
+            }
         salaries.append(salary_data)
 
         job_roles_data = []
-        # job_roles_data = [[36],[36],[25]]
-        # job_roles_data = [{role: 36}, {role: 25}, ...]
+        # job_roles_data = [[{"role":36}],[{"role":36}],[],...]
         if vacancy['professional_roles'] is not None:
-            job_roles_data = {"role": vacancy["professional_roles"]["id"]}
-            # job_roles_data = [int(role['id']) for role in vacancy['professional_roles']]
+            for role in vacancy["professional_roles"]:
+                job_roles_data.append({"role_id": int(role["id"])})
         job_roles.append(job_roles_data)
 
         job_skills_data = []
         # job_skills_data = [[{name: "SQL"},{name: "Python"}],...]
         if vacancy["key_skills"] is not None and len(vacancy["key_skills"]) > 0:
-            job_skills_data = [skill['name'] for skill in vacancy['key_skills']]
+            for skill in vacancy["key_skills"]:
+                job_skills_data.append({"skill_name": skill["name"]})
         job_skills.append(job_skills_data)
 
     return {
