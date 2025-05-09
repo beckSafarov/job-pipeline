@@ -3,11 +3,8 @@ from airflow.decorators import (  # type:ignore
     task,
 )  # This DAG uses the TaskFlow API. See: https://www.astronomer.io/docs/learn/airflow-decorators
 from pendulum import datetime, duration #type: ignore
-from utils.hh_api import get_all_vacancies, get_vacancy_details, get_latest_vacancies  # type: ignore
+from utils.hh_api import get_vacancy_details, get_latest_vacancies  # type: ignore
 from utils.split_vac_data import split_vac_data
-from utils.cache_utils import get_cached_response
-# import requests # type: ignore
-import json 
 import time  # type: ignore
 from dags.utils.insert_to_db import insert_to_table
 from utils.common_utils import get_files_from_paths, get_json, write_json

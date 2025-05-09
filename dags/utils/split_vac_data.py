@@ -2,7 +2,6 @@ def handle_work_format(formats: list) -> str:
     if len(formats) < 1:
         return formats
     format_ids = [format["id"].lower() for format in formats]
-
     if "on_site" in format_ids and "remote" in format_ids:
         return "hybrid"
     return format_ids[0]
