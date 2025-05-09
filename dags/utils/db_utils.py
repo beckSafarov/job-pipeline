@@ -1,8 +1,8 @@
 from airflow.hooks.postgres_hook import PostgresHook  # type:ignore
 from sqlalchemy.orm import sessionmaker  # type:ignore
-from sqlalchemy import select #type:ignore
-from models.index import Job
-
+from sqlalchemy import select  # type:ignore
+from utils.common_utils import write_json
+import json
 
 def get_db_engine():
     hook = PostgresHook(postgres_conn_id="supabase_db")
@@ -16,10 +16,22 @@ def create_session():
 
 
 def query_latest_vacancy():
+    from models.index import Job
+
     session = create_session()
-    query = (
-        select(Job)  # Select all columns from Job table
-        .order_by(Job.published_at.desc())  # Order by published_at DESC
-        .limit(1)  # Limit to 1 row
-    )
-    return session.execute(query).scalar_one_or_none()
+    query = select(Job).order_by(Job.published_at.desc()).limit(1)
+    result = session.execute(query).scalar_one_or_none()
+    if result is None:
+        json_data = {}  # Or None, depending on your needs
+    else:
+        # Convert model instance to dictionary
+        json_data = {
+            column.name: getattr(result, column.name)
+            for column in result.__table__.columns
+        }
+
+    # Serialize to JSON
+    json_string = json.dumps(json_data, default=str)
+    # file_path = "/tmp/latest_vacancy.json"
+    # write_json(json_data, file_path)
+    return json_data

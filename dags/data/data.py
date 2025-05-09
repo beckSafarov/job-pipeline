@@ -25,11 +25,3 @@ roles = [
     {"name": "cto", "id": 125},
     {"name": "technical-writer", "id": 126},
 ]
-
-countries = [
-    {"id": 16, "code": "be"},  # Belarus
-    {"id": 113, "code": "ru"},  # Russia
-    {"id": 40, "code": "kz"},  # Kazakhstan
-    {"id": 48, "code": "kg"},  # Kyrgyzstan
-    {"id": 97, "code": "uz"},  # Uzbekistan
-]

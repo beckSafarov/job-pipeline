@@ -3,17 +3,19 @@ from airflow.decorators import (  # type:ignore
     task,
 )  # This DAG uses the TaskFlow API. See: https://www.astronomer.io/docs/learn/airflow-decorators
 from pendulum import datetime, duration #type: ignore
-from utils.hh_api import get_all_vacancies,get_vacancy_details # type: ignore
+from utils.hh_api import get_all_vacancies, get_vacancy_details, get_latest_vacancies  # type: ignore
 from utils.split_vac_data import split_vac_data
 from utils.cache_utils import get_cached_response
 # import requests # type: ignore
 import json 
 import time  # type: ignore
 from dags.utils.insert_to_db import insert_to_table
-from utils.common_utils import get_files_from_paths
+from utils.common_utils import get_files_from_paths, get_json, write_json
 from utils.prep_to_db import prep_dict_lists, prep_nested_lists
 from data.data import roles
 from utils.db_utils import query_latest_vacancy
+from utils.date_utils import is_earlier
+
 
 @dag(
     start_date=datetime(2024, 1, 1),  # date after which the DAG can be scheduled
@@ -26,7 +28,7 @@ from utils.db_utils import query_latest_vacancy
         "retries": 3,  # tasks retry 3 times before they fail
         "retry_delay": duration(seconds=5),  # tasks wait 30s in between retries
     },  # default_args are applied to all tasks in a DAG
-    tags=["example", "space"],  # add tags in the UI
+    tags=["hh", "vacancies"],  # add tags in the UI
     is_paused_upon_creation=False,  # start running the DAG as soon as its created
 )
 
@@ -35,10 +37,11 @@ def hh_vacancies():
     @task
     def fetch_latest_publication():
         latest_vacancy = query_latest_vacancy()
-        return latest_vacancy
+        published_at = latest_vacancy.get("published_at", {}).isoformat()
+        return published_at
 
     @task
-    def fetch_basic_vacancies(**context) -> list[dict]:
+    def fetch_basic_vacancies(published_at: str) -> str:
         """
         This task uses the requests library to retrieve a list of vacancies
         currently available at HH. The results are pushed to XCom with a specific key
@@ -52,21 +55,34 @@ def hh_vacancies():
         Returns:
             list[dict]: A list of vacancies currently available at HH.
         """
-        role_ids = [role["id"] for role in roles]
-        all_vacancies = []
-        for role_id in role_ids:
-            vacs_for_curr_role = get_all_vacancies(97, role_id)
-            all_vacancies.extend(vacs_for_curr_role)
-
+        all_vacancies = get_latest_vacancies(published_at)
         file_path = "/tmp/vacancies.json"
-        with open(file_path, "w") as f:
-            json.dump(all_vacancies, f)
+        write_json(all_vacancies, file_path)
         return file_path
 
     @task
+    def filter_irrelevant_vacancies(path: str, latest_publish: str) -> str:
+        vacancies = get_json(path)
+        role_ids = [role["id"] for role in roles]
+        latest_it_vacancies = []
+        for vac in vacancies:
+            vac_role_ids = [int(role["id"]) for role in vac["professional_roles"]]
+            is_relevant = any(role in vac_role_ids for role in role_ids)
+            if is_relevant is False:
+                continue
+
+            vac_pub_date = vac["published_at"].replace("+0300", "+0500")
+            is_vac_fresh = is_earlier(latest_publish, vac_pub_date)
+            if is_vac_fresh is False:
+                continue
+            latest_it_vacancies.append(vac)
+        write_path = "/tmp/filtered_vacancies.json"
+        write_json(latest_it_vacancies, write_path)
+        return write_path
+
+    @task
     def fetch_detailed_vacancies(path: str) -> str:
-        with open(path, "r") as f:
-            vacancies = json.load(f)
+        vacancies = get_json(path)
 
         for vacancy in vacancies:   
             vacancy_id = vacancy["id"]
@@ -80,15 +96,13 @@ def hh_vacancies():
             time.sleep(0.2)  # Add a small delay to be nice to the API
 
         file_path = "/tmp/vacancy_details.json"
-        with open(file_path, "w") as f:
-            json.dump(vacancies, f)
+        write_json(vacancies, file_path)
         return file_path
 
     @task
     def transform_and_split_data(path: str) -> list:
         """ """
-        with open(path, "r") as f:
-            vacancies = json.load(f)
+        vacancies = get_json(path)
         if vacancies is None:
             print("No vacancies found.")
             return
@@ -99,8 +113,7 @@ def hh_vacancies():
         for table_name in tables.keys():
             table_path = f"/tmp/{table_name}.json"
             paths.append(table_path)
-            with open(table_path, "w") as f:
-                json.dump(tables[table_name], f)
+            write_json(tables[table_name], table_path)
         return paths
 
     @task
@@ -121,45 +134,19 @@ def hh_vacancies():
         job_skills_with_ids = prep_nested_lists(job_ids, job_skills)
         job_languages_with_ids = prep_nested_lists(job_ids, job_languages)
 
-        # print("some tables with ids below")
         insert_to_table("Address", addresses_with_ids)
-        # print(salaries_with_ids)
         insert_to_table("Salary", salaries_with_ids)
-        # print(job_languages_with_ids)
         insert_to_table("JobLanguage", job_languages_with_ids)
-        # print(job_roles_with_ids)
         insert_to_table("JobRole", job_roles_with_ids)
-        # print(job_skills_with_ids)
         insert_to_table("JobSkill", job_skills_with_ids)
-
-        # print(f"Inserted {len(job_ids)} jobs.")
         return None
 
-    @task 
-    def print_tables(paths: list)->None:
-        tables = []
-
-        if len(paths) < 1:
-            print('paths is less than 1')
-            return 
-
-        for path in paths:
-            with open(path, "r") as f:
-                curr_table = json.load(f)
-                tables.append(curr_table)
-
-        for table in tables:
-            print(table)
-            print('\n')
-
-    # path_to_vacancies_file = fetch_basic_vacancies()
-    # path_to_detailed_vacancies_file = fetch_detailed_vacancies(path_to_vacancies_file)
-    # paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
-    fetch_latest_publication()
-    # print_tables(paths_to_tables)
-    # load_to_db(paths_to_tables)
-    # if len(paths_to_tables > 1):
-    # print_jobs(paths_to_tables)
+    published_at = fetch_latest_publication()
+    basic_vacancies_path = fetch_basic_vacancies(published_at)
+    filtered_vacs_path = filter_irrelevant_vacancies(basic_vacancies_path, published_at)
+    path_to_detailed_vacancies_file = fetch_detailed_vacancies(filtered_vacs_path)
+    paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
+    load_to_db(paths_to_tables)
 
 
 # Instantiate the DAG

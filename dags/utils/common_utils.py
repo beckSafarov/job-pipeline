@@ -1,5 +1,6 @@
 import json
 from itertools import chain
+from config import API
 
 def is_empty_dict(item:dict)->bool:
   return len(list(item.keys())) < 1
@@ -34,13 +35,44 @@ def map_ids_to_dicts(ids: list, data: list, key_name:str = 'job_id')->list:
     return data
 
 
+def write_json(data: dict | list, path: str) -> None:
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
 def get_json(path: str):
     with open(path, "r") as f:
         return json.load(f)
-
 
 def get_files_from_paths(paths: list):
     files = []
     for path in paths:
         files.append(get_json(path))
     return files
+
+from urllib.parse import urlencode, urlunparse
+
+
+def build_encoded_hh_url(params):
+    """
+    Given a base URL and query params, returns a properly URL-encoded HH API request URL.
+    """
+    split_api = API.split("/")
+    scheme, netloc, path = "https", split_api[2], split_api[3]
+
+    # Encode query parameters
+    query_string = urlencode(params, safe=":")
+
+    if "date_from" in params:
+        params["date_from"].replace("+03", "+05")
+
+    # Construct full URL
+    return urlunparse((scheme, netloc, path, "", query_string, ""))
+
+
+# Your query parameters
+params = {"per_page": 100, "area": 97, "date_from": "2025-05-08T10:24:29+0300"}
+
+# Build and print the final URL
+final_url = build_encoded_hh_url(params)
+print(final_url)
