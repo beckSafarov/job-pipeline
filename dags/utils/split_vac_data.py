@@ -23,7 +23,7 @@ def build_job_data(vacancy: dict) -> dict:
         "source_id": int(vacancy["id"]),
         "title": vacancy["name"],
         "area_id": int(vacancy["area"]["id"]),
-        "employer_id": int(vacancy["employer"]["id"]),
+        "employer": int(vacancy["employer"]["id"]),
         "schedule": vacancy["schedule"]["id"],
         "work_format": handle_work_format(vacancy["work_format"]),
         "working_hours": handle_work_hours(vacancy["working_hours"]),

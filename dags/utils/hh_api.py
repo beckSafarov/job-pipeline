@@ -16,9 +16,15 @@ def get_vacancies_by_page_and_role(page=1, role_id=10, country_id=97):
         return None
 
 
-def get_latest_vacancies_by_page(date_from: str, page=1, country_id=97):
+def get_latest_vacancies_by_page(date_from: str, role: int, page=0, country_id=97):
     url = build_encoded_hh_url(
-        {"area": country_id, "page": page, "date_from": date_from, "per_page": 100}
+        {
+            "area": country_id,
+            "page": page,
+            "date_from": date_from,
+            "per_page": 100,
+            "professional_role": role,
+        }
     )
 
     try:
@@ -30,9 +36,9 @@ def get_latest_vacancies_by_page(date_from: str, page=1, country_id=97):
         return None
 
 
-def get_latest_vacancies(date_from: str, country_id: int = 97) -> list:
+def get_latest_vacancies(date_from: str, role_id: int, country_id: int = 97) -> list:
     # Get first page and initialize variables
-    json_data = get_latest_vacancies_by_page(date_from)
+    json_data = get_latest_vacancies_by_page(date_from, role_id)
 
     if not json_data:
         print("Error fetching data from API")
@@ -48,7 +54,7 @@ def get_latest_vacancies(date_from: str, country_id: int = 97) -> list:
     # Fetch remaining pages
     if pages > 1:
         for i in range(1, pages):
-            more_jobs = get_latest_vacancies_by_page(date_from, i + 1)
+            more_jobs = get_latest_vacancies_by_page(date_from, role_id, i + 1)
 
             if more_jobs:
                 jobs.extend(more_jobs["items"])

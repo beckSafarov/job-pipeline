@@ -5,6 +5,7 @@ from utils.common_utils import (
     remove_empty_lists,
     flatten,
     is_empty_list,
+    filter_dicts_without_prop,
 )
 
 
@@ -19,12 +20,13 @@ def prep_dict_lists(ids:list, data:list)->list:
         list: e.g. [{'id':1, 'from': None, 'to': 39000000, 'currency': 'UZS'}]
     """
     if is_empty_list(ids) or is_empty_list(data):
-      return  
+        return
     mapped_to_ids = map_ids_to_dicts(ids,data)
-    return remove_empty_dicts(mapped_to_ids)
+    filtered = filter_dicts_without_prop(mapped_to_ids, "id")
+    return filtered
 
 def prep_nested_lists(ids:list, data:list)->list:
-  """prepares nested lists to load to db
+    """prepares nested lists to load to db
 
   Args:
       ids (list): e.g. [1,2,3,4,...]
@@ -33,8 +35,10 @@ def prep_nested_lists(ids:list, data:list)->list:
   Returns:
       list: e.g. [{'id': 1, 'name': "Python"},{'id':1, 'name':'Excel'},...]
   """
-  if is_empty_list(ids) or is_empty_list(data):
-    return  
-  mapped_to_ids = map_ids_to_nested_dicts(ids,data)
-  empty_lists_removed = remove_empty_lists(mapped_to_ids)
-  return flatten(empty_lists_removed)
+    if is_empty_list(ids) or is_empty_list(data):
+        return
+    mapped_to_ids = map_ids_to_nested_dicts(ids, data)
+    empty_lists_removed = remove_empty_lists(mapped_to_ids)
+    flattened = flatten(empty_lists_removed)
+    filtered = filter_dicts_without_prop(flattened, "job_id")
+    return filtered

@@ -1,5 +1,8 @@
 from models.index import Job,Employer,Address,Salary,JobLanguage,JobRole,JobSkill
 from utils.db_utils import create_session
+from sqlalchemy.dialects.postgresql import insert  # type:ignore
+from data.data import model_pks
+
 
 models_lookup = {
     "Employer": Employer,
@@ -11,78 +14,79 @@ models_lookup = {
     "JobSkill":JobSkill,
 }
 
-def is_invalid_item(item):
-    return type(item) is not dict or len(list(item.keys())) < 1
+
+def insert_new_job(data: list) -> list:
+    source_ids = [item["source_id"] for item in data]
+    session = create_session()
+    # 1. Query existing jobs
+    existing = (
+        session.query(Job.source_id, Job.id).filter(Job.source_id.in_(source_ids)).all()
+    )
+    existing_map = {src_id: job_id for src_id, job_id in existing}
+
+    inserted_ids = []
+
+    for item in data:
+        src_id = item["source_id"]
+
+        # Skip if already exists
+        if src_id in existing_map:
+            inserted_ids.append(None)
+            continue
+
+        # Try inserting
+        stmt = (
+            insert(Job)
+            .values(**item)
+            .on_conflict_do_nothing(index_elements=["source_id"])
+            .returning(Job.id)
+        )
+        result = session.execute(stmt)
+        new_id = result.scalar()
+
+        if new_id:
+            inserted_ids.append(new_id)
+            existing_map[src_id] = new_id  # optional: update the map
+
+    session.commit()
+    session.close()
+    return inserted_ids
 
 
-def insert_to_table(model_name: str, data: list) -> list:
+def insert_to_table(model_name: str, data: list) -> list | None:
     if data is None:
         print(f"No data for {model_name}")
         return []
     if len(data) < 1:
         return []
 
+    if model_name == "Job":
+        job_ids = insert_new_job(data)
+        return job_ids
+    print(f"Running {model_name}")
     session = create_session()
-    record_ids = []
     model_class = models_lookup[model_name]
 
     try:
+        # Process all items in a single transaction
         for item in data:
-            if is_invalid_item(item):
-                continue
-
-            # Check if item already exists based on primary key
-            # For tables with 'id' as primary key
-            if "id" in item and item["id"] is not None:
-                existing_record = (
-                    session.query(model_class).filter_by(id=item["id"]).first()
+            stmt = (
+                insert(model_class)
+                .values(**item)
+                .on_conflict_do_nothing(index_elements=model_pks[model_name])
+                .returning(
+                    model_class.id
+                    if model_name in ["Job", "Employer"]
+                    else model_class.job_id
                 )
-                if existing_record:
-                    # Record already exists, skip insertion or update if needed
-                    record_ids.append(existing_record.id)
-                    continue
-            # For tables with 'job_id' as primary key or part of composite key
-            elif "job_id" in item:
-                # Get primary key fields for this model
-                primary_keys = [
-                    key.name for key in model_class.__table__.primary_key.columns
-                ]
+            )
+            session.execute(stmt)
 
-                # Build filter conditions based on primary keys in the item
-                filter_conditions = {}
-                for pk in primary_keys:
-                    if pk in item:
-                        filter_conditions[pk] = item[pk]
-
-                # Only check if we have all primary key values
-                if len(filter_conditions) == len(primary_keys):
-                    existing_record = (
-                        session.query(model_class)
-                        .filter_by(**filter_conditions)
-                        .first()
-                    )
-                    if existing_record:
-                        # For composite primary keys, we might not have a single .id field
-                        # Still add job_id to record_ids if it exists
-                        if hasattr(existing_record, "id"):
-                            record_ids.append(existing_record.id)
-                        elif hasattr(existing_record, "job_id"):
-                            record_ids.append(existing_record.job_id)
-                        continue
-
-            # If we get here, record doesn't exist, so insert it
-            record = model_class(**item)
-            session.add(record)
-            session.flush()  # Ensures record.id is generated
-
-            # Add the ID to our return list
-            if hasattr(record, "id"):
-                record_ids.append(record.id)
-            elif hasattr(record, "job_id"):
-                record_ids.append(record.job_id)
-
+        # Flush and commit only once after processing all items
+        session.flush()
         session.commit()
-        return record_ids
+        return None
+
     except Exception as e:
         session.rollback()
         raise e

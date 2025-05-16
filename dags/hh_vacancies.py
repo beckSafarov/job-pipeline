@@ -7,15 +7,19 @@ from utils.hh_api import get_vacancy_details, get_latest_vacancies  # type: igno
 from utils.split_vac_data import split_vac_data
 import time  # type: ignore
 from dags.utils.insert_to_db import insert_to_table
-from utils.common_utils import get_files_from_paths, get_json, write_json
+from utils.common_utils import (
+    get_files_from_paths,
+    get_json,
+    write_json,
+)
 from utils.prep_to_db import prep_dict_lists, prep_nested_lists
 from data.data import roles
 from utils.db_utils import query_latest_vacancy
-from utils.date_utils import is_earlier
+from utils.filter_utils import is_vac_fresh
 
 
 @dag(
-    start_date=datetime(2024, 1, 1),  # date after which the DAG can be scheduled
+    start_date=datetime(2025, 1, 1),  # date after which the DAG can be scheduled
     schedule="@daily",  # see: https://www.astronomer.io/docs/learn/scheduling-in-airflow for options
     catchup=False,  # see: https://www.astronomer.io/docs/learn/rerunning-dags#catchup
     max_consecutive_failed_dag_runs=5,  # auto-pauses the DAG after 5 consecutive failed runs, experimental
@@ -52,25 +56,23 @@ def hh_vacancies():
         Returns:
             list[dict]: A list of vacancies currently available at HH.
         """
-        all_vacancies = get_latest_vacancies(published_at)
+        role_ids = [role["id"] for role in roles]
+        # role_ids = [96]
+        all_vacancies = []
+        for role_id in role_ids:
+            role_vacs = get_latest_vacancies(published_at, role_id)
+            all_vacancies.extend(role_vacs)
         file_path = "/tmp/vacancies.json"
         write_json(all_vacancies, file_path)
         return file_path
 
     @task
-    def filter_irrelevant_vacancies(path: str, latest_publish: str) -> str:
+    def filter_old_vacancies(path: str, latest_publish: str) -> str:
         vacancies = get_json(path)
-        role_ids = [role["id"] for role in roles]
         latest_it_vacancies = []
         for vac in vacancies:
-            vac_role_ids = [int(role["id"]) for role in vac["professional_roles"]]
-            is_relevant = any(role in vac_role_ids for role in role_ids)
-            if is_relevant is False:
-                continue
-
-            vac_pub_date = vac["published_at"].replace("+0300", "+0500")
-            is_vac_fresh = is_earlier(latest_publish, vac_pub_date)
-            if is_vac_fresh is False:
+            is_fresh_vac = is_vac_fresh(latest_publish, vac["published_at"])
+            if is_fresh_vac is False:
                 continue
             latest_it_vacancies.append(vac)
         write_path = "/tmp/filtered_vacancies.json"
@@ -122,7 +124,6 @@ def hh_vacancies():
         jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
             get_files_from_paths(paths)
         )
-
         insert_to_table("Employer", employers)
         job_ids = insert_to_table("Job", jobs)
         salaries_with_ids = prep_dict_lists(job_ids, salaries)
@@ -130,7 +131,6 @@ def hh_vacancies():
         job_roles_with_ids = prep_nested_lists(job_ids, job_roles)
         job_skills_with_ids = prep_nested_lists(job_ids, job_skills)
         job_languages_with_ids = prep_nested_lists(job_ids, job_languages)
-
         insert_to_table("Address", addresses_with_ids)
         insert_to_table("Salary", salaries_with_ids)
         insert_to_table("JobLanguage", job_languages_with_ids)
@@ -138,9 +138,18 @@ def hh_vacancies():
         insert_to_table("JobSkill", job_skills_with_ids)
         return None
 
+    @task
+    def print_test(paths: list):
+        # vacancies = get_json(path)
+        jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
+            get_files_from_paths(paths)
+        )
+        print(jobs)
+        return salaries
+
     published_at = fetch_latest_publication()
     basic_vacancies_path = fetch_basic_vacancies(published_at)
-    filtered_vacs_path = filter_irrelevant_vacancies(basic_vacancies_path, published_at)
+    filtered_vacs_path = filter_old_vacancies(basic_vacancies_path, published_at)
     path_to_detailed_vacancies_file = fetch_detailed_vacancies(filtered_vacs_path)
     paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
     load_to_db(paths_to_tables)
