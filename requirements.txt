@@ -1,7 +1,7 @@
 apache-airflow-providers-github
-apache-airflow-providers-postgres>=5.14.0
+apache-airflow-providers-postgres
 sqlalchemy
-requests>=2.31.0
-pendulum>=2.1.2
+requests
+pendulum
 pytz
-psycopg2-binary>=2.9.9
+psycopg2-binary
