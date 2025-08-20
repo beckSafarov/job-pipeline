@@ -1,0 +1,9 @@
+# Common files to ignore in Docker builds
+.git
+.gitignore
+README.md
+.DS_Store
+.vscode/
+*.log
+.env
+.astro.disabled

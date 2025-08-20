@@ -30,7 +30,7 @@ def build_job_data(vacancy: dict) -> dict:
         "employment_form": vacancy["employment_form"]["id"],
         "experience": vacancy["experience"]["id"],
         "is_internship": vacancy["internship"],
-        "description": vacancy["description"],
+        "description": vacancy.get("description", ""),
         "published_at": vacancy["published_at"],
     }
 
@@ -81,8 +81,11 @@ def build_salaries_data(vacancy: dict) -> dict:
 
 
 def build_job_roles_data(vacancy: dict) -> list:
+    # job_roles_data = []
     job_roles_data = []
     if vacancy["professional_roles"] is not None:
+        # role = vacancy["professional_roles"][0]
+        # job_roles_data = {"source_id": source_id, "role_id": int(role["id"])}
         for role in vacancy["professional_roles"]:
             job_roles_data.append({"role_id": int(role["id"])})
     # job_roles_data = [[{"role":36}],[{"role":36}],[],...]
@@ -121,6 +124,7 @@ def split_vac_data(vacancies: list) -> None:
     # Extracting and transforming data
 
     for vacancy in vacancies:
+
         job_data = build_job_data(vacancy)
         jobs.append(job_data)
         employer_data = build_employer_data(vacancy)
@@ -130,6 +134,7 @@ def split_vac_data(vacancies: list) -> None:
         languages_data = build_languages_data(vacancy)
         languages.append(languages_data)
         salary_data = build_salaries_data(vacancy)
+        print(salary_data)
         salaries.append(salary_data)
         job_roles_data = build_job_roles_data(vacancy)
         job_roles.append(job_roles_data)

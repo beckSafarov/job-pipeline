@@ -30,7 +30,7 @@ from utils.filter_utils import is_vac_fresh
         "retry_delay": duration(seconds=5),  # tasks wait 30s in between retries
     },  # default_args are applied to all tasks in a DAG
     tags=["hh", "vacancies"],  # add tags in the UI
-    is_paused_upon_creation=False,  # start running the DAG as soon as its created
+    is_paused_upon_creation=True,  # DAG will be paused when created - prevents auto-running
 )
 
 def hh_vacancies():
@@ -57,7 +57,7 @@ def hh_vacancies():
             list[dict]: A list of vacancies currently available at HH.
         """
         role_ids = [role["id"] for role in roles]
-        # role_ids = [96]
+        # role_ids = [125]
         all_vacancies = []
         for role_id in role_ids:
             role_vacs = get_latest_vacancies(published_at, role_id)
@@ -65,19 +65,6 @@ def hh_vacancies():
         file_path = "/tmp/vacancies.json"
         write_json(all_vacancies, file_path)
         return file_path
-
-    @task
-    def filter_old_vacancies(path: str, latest_publish: str) -> str:
-        vacancies = get_json(path)
-        latest_it_vacancies = []
-        for vac in vacancies:
-            is_fresh_vac = is_vac_fresh(latest_publish, vac["published_at"])
-            if is_fresh_vac is False:
-                continue
-            latest_it_vacancies.append(vac)
-        write_path = "/tmp/filtered_vacancies.json"
-        write_json(latest_it_vacancies, write_path)
-        return write_path
 
     @task
     def fetch_detailed_vacancies(path: str) -> str:
@@ -124,18 +111,58 @@ def hh_vacancies():
         jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
             get_files_from_paths(paths)
         )
+
+        # Debug: Print data structure before insertion
+        print("Sample job data:", jobs[:1] if jobs else "No jobs")
+        print("Sample employer data:", employers[:1] if employers else "No employers")
+
+        # Employers table gets no additional ID columns
         insert_to_table("Employer", employers)
         job_ids = insert_to_table("Job", jobs)
-        salaries_with_ids = prep_dict_lists(job_ids, salaries)
-        addresses_with_ids = prep_dict_lists(job_ids, addresses)
-        job_roles_with_ids = prep_nested_lists(job_ids, job_roles)
-        job_skills_with_ids = prep_nested_lists(job_ids, job_skills)
-        job_languages_with_ids = prep_nested_lists(job_ids, job_languages)
-        insert_to_table("Address", addresses_with_ids)
-        insert_to_table("Salary", salaries_with_ids)
-        insert_to_table("JobLanguage", job_languages_with_ids)
-        insert_to_table("JobRole", job_roles_with_ids)
-        insert_to_table("JobSkill", job_skills_with_ids)
+
+        print("addresses:")
+        print(addresses)
+
+        # Use job_id instead of source_id for related tables
+        salaries_with_ids = prep_dict_lists(job_ids, salaries, id_column="job_id")
+        addresses_with_ids = prep_dict_lists(job_ids, addresses, id_column="job_id")
+        job_roles_with_ids = prep_nested_lists(job_ids, job_roles, id_column="job_id")
+        job_skills_with_ids = prep_nested_lists(job_ids, job_skills, id_column="job_id")
+        job_languages_with_ids = prep_nested_lists(
+            job_ids, job_languages, id_column="job_id"
+        )
+
+        print(
+            "Salaries columns:",
+            list(salaries_with_ids[0].keys()) if salaries_with_ids else "No salaries",
+        )
+        print(
+            "Addresses columns:",
+            (
+                list(addresses_with_ids[0].keys())
+                if addresses_with_ids
+                else "No addresses"
+            ),
+        )
+        print(
+            "Job roles columns:",
+            (
+                list(job_roles_with_ids[0].keys())
+                if job_roles_with_ids
+                else "No job roles"
+            ),
+        )
+
+        try:
+            insert_to_table("Address", addresses_with_ids)
+            insert_to_table("Salary", salaries_with_ids)
+            insert_to_table("JobLanguage", job_languages_with_ids)
+            insert_to_table("JobRole", job_roles_with_ids)
+            insert_to_table("JobSkill", job_skills_with_ids)
+        except Exception as e:
+            print(f"Error during insertion: {e}")
+            raise
+
         return None
 
     @task
@@ -147,11 +174,12 @@ def hh_vacancies():
         print(jobs)
         return salaries
 
-    published_at = fetch_latest_publication()
+    # published_at = fetch_latest_publication()
+    published_at = "2025-05-11T03:42:00"
     basic_vacancies_path = fetch_basic_vacancies(published_at)
-    filtered_vacs_path = filter_old_vacancies(basic_vacancies_path, published_at)
-    path_to_detailed_vacancies_file = fetch_detailed_vacancies(filtered_vacs_path)
+    path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
     paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
+    # print_test(paths_to_tables)
     load_to_db(paths_to_tables)
 
 

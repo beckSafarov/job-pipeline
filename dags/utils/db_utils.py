@@ -1,7 +1,6 @@
-from airflow.hooks.postgres_hook import PostgresHook  # type:ignore
+from airflow.providers.postgres.hooks.postgres import PostgresHook  # type:ignore
 from sqlalchemy.orm import sessionmaker  # type:ignore
 from sqlalchemy import select  # type:ignore
-from utils.common_utils import write_json
 import json
 
 def get_db_engine():
