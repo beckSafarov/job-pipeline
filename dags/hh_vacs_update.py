@@ -2,7 +2,7 @@ from airflow.decorators import (  # type:ignore
     dag,
     task,
 )  # This DAG uses the TaskFlow API. See: https://www.astronomer.io/docs/learn/airflow-decorators
-from pendulum import datetime, duration #type: ignore
+from pendulum import datetime, duration  # type: ignore
 from utils.hh_api import get_vacancy_details, get_latest_vacancies  # type: ignore
 from utils.split_vac_data import split_vac_data
 import time  # type: ignore
@@ -16,6 +16,7 @@ from utils.prep_to_db import prep_dict_lists, prep_nested_lists
 from data.data import roles
 from utils.db_utils import query_latest_vacancy
 from utils.filter_utils import is_vac_fresh
+from utils.db_utils import query_jobs_published_in_june, query_jobs_published_in_month
 
 
 @dag(
@@ -32,7 +33,6 @@ from utils.filter_utils import is_vac_fresh
     tags=["hh", "vacancies"],  # add tags in the UI
     is_paused_upon_creation=True,  # DAG will be paused when created - prevents auto-running
 )
-
 def hh_vacancies():
 
     @task
@@ -67,11 +67,18 @@ def hh_vacancies():
         return file_path
 
     @task
+    def fetch_vacs_for_july() -> str:
+        all_vacancies = query_jobs_published_in_month(month=7, year=2025)
+        file_path = "/tmp/vacancies.json"
+        write_json(all_vacancies, file_path)
+        return file_path
+
+    @task
     def fetch_detailed_vacancies(path: str) -> str:
         vacancies = get_json(path)
 
-        for vacancy in vacancies:   
-            vacancy_id = vacancy["id"]
+        for vacancy in vacancies:
+            vacancy_id = vacancy["source_id"]
             vacancy_details = get_vacancy_details(vacancy_id)
             if vacancy_details:
                 # Define properties to update with their default values
@@ -111,10 +118,10 @@ def hh_vacancies():
         return paths
 
     @task
-    def load_to_db(paths:list)->None:
+    def load_to_db(paths: list) -> None:
         if len(paths) < 1:
             print("Paths is empty")
-            return 
+            return
 
         jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
             get_files_from_paths(paths)
@@ -126,7 +133,8 @@ def hh_vacancies():
 
         # Employers table gets no additional ID columns
         insert_to_table("Employer", employers)
-        job_ids = insert_to_table("Job", jobs)
+        # job_ids = insert_to_table("Job", jobs)
+        job_ids = [item["id"] for item in jobs]
 
         print("addresses:")
         print(addresses)
@@ -139,6 +147,21 @@ def hh_vacancies():
         job_languages_with_ids = prep_nested_lists(
             job_ids, job_languages, id_column="job_id"
         )
+
+        # Filter out invalid role_ids to prevent foreign key violations
+        if job_roles_with_ids:
+            valid_role_ids = {role["id"] for role in roles}
+            original_count = len(job_roles_with_ids)
+            job_roles_with_ids = [
+                role
+                for role in job_roles_with_ids
+                if role.get("role_id") in valid_role_ids
+            ]
+            filtered_count = len(job_roles_with_ids)
+            if original_count != filtered_count:
+                print(
+                    f"Filtered out {original_count - filtered_count} job roles with invalid role_ids"
+                )
 
         print(
             "Salaries columns:",
@@ -183,12 +206,14 @@ def hh_vacancies():
         return salaries
 
     # published_at = fetch_latest_publication()
-    published_at = "2025-05-11T03:42:00"
-    basic_vacancies_path = fetch_basic_vacancies(published_at)
-    path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
-    paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
+    # published_at = "2025-05-11T03:42:00"
+
+    # basic_vacancies_path = fetch_basic_vacancies(published_at)
+    # basic_vacancies_path = fetch_vacs_for_july()
+    # path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
+    # paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
     # print_test(paths_to_tables)
-    load_to_db(paths_to_tables)
+    # load_to_db(paths_to_tables)
 
 
 # Instantiate the DAG

@@ -36,6 +36,8 @@ def build_job_data(vacancy: dict) -> dict:
 
 
 def build_employer_data(vacancy: dict) -> dict:
+    if "employer" not in vacancy or vacancy["employer"] is None:
+        return {}
     return {
         "id": int(vacancy["employer"]["id"]),
         "name": vacancy["employer"]["name"],
@@ -44,51 +46,62 @@ def build_employer_data(vacancy: dict) -> dict:
 
 
 def build_address_data(vacancy: dict) -> dict:
-    if vacancy["address"] is None:
+    # Handle both API data (with nested address) and database data (flat structure)
+    if "address" in vacancy and vacancy["address"] is not None:
+        # API data structure
+        return {
+            "lat": float(vacancy["address"]["lat"]),
+            "lng": float(vacancy["address"]["lng"]),
+            "city": vacancy["address"]["city"],
+            "street": vacancy["address"]["street"],
+            "building": vacancy["address"]["building"],
+        }
+    else:
+        # Database data structure or no address data
         return {}
-    return {
-        "lat": float(vacancy["address"]["lat"]),
-        "lng": float(vacancy["address"]["lng"]),
-        "city": vacancy["address"]["city"],
-        "street": vacancy["address"]["street"],
-        "building": vacancy["address"]["building"],
-    }
 
 
 def build_languages_data(vacancy: dict) -> list:
-    if vacancy["languages"] is None:
+    # Handle both API data (with nested languages) and database data (flat structure)
+    if "languages" in vacancy and vacancy["languages"] is not None:
+        # API data structure
+        languages_data = []
+        for language in vacancy["languages"]:
+            languages_data.append(
+                {
+                    "lang_id": language["id"],
+                    "lang_level": language["level"]["id"],
+                }
+            )
+        return languages_data
+    else:
+        # Database data structure or no languages data
         return []
-    languages_data = []
-    for language in vacancy["languages"]:
-        languages_data.append(
-            {
-                "lang_id": language["id"],
-                "lang_level": language["level"]["id"],
-            }
-        )
-    return languages_data
 
 
 def build_salaries_data(vacancy: dict) -> dict:
-    salary_data = {}
-    if vacancy["salary"] is not None:
+    # Handle both API data (with nested salary) and database data (flat structure)
+    if "salary" in vacancy and vacancy["salary"] is not None:
+        # API data structure
         salary_data = {
             "salary_from": vacancy["salary"]["from"],
             "salary_to": vacancy["salary"]["to"],
             "currency": vacancy["salary"]["currency"],
         }
-    return salary_data
+        return salary_data
+    else:
+        # Database data structure or no salary data
+        return {}
 
 
 def build_job_roles_data(vacancy: dict) -> list:
-    # job_roles_data = []
+    # Handle both API data (with nested professional_roles) and database data (flat structure)
     job_roles_data = []
-    if vacancy["professional_roles"] is not None:
-        # role = vacancy["professional_roles"][0]
-        # job_roles_data = {"source_id": source_id, "role_id": int(role["id"])}
+    if "professional_roles" in vacancy and vacancy["professional_roles"] is not None:
+        # API data structure
         for role in vacancy["professional_roles"]:
             job_roles_data.append({"role_id": int(role["id"])})
-    # job_roles_data = [[{"role":36}],[{"role":36}],[],...]
+    # For database data, we don't have this nested structure, so return empty list
     return job_roles_data
 
 
@@ -102,10 +115,16 @@ def build_job_skills_data(vacancy: dict) -> list:
         list: [[{name: "SQL"},{name: "Python"}],...]
     """
     job_skills_data = []
-    # job_skills_data = [[{name: "SQL"},{name: "Python"}],...]
-    if vacancy["key_skills"] is not None and len(vacancy["key_skills"]) > 0:
+    # Handle both API data (with nested key_skills) and database data (flat structure)
+    if (
+        "key_skills" in vacancy
+        and vacancy["key_skills"] is not None
+        and len(vacancy["key_skills"]) > 0
+    ):
+        # API data structure
         for skill in vacancy["key_skills"]:
             job_skills_data.append({"skill_name": skill["name"]})
+    # For database data, we don't have this nested structure, so return empty list
     return job_skills_data
 
 
