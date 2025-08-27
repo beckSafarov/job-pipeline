@@ -155,6 +155,8 @@ class Salary(Base):
     job_id = Column(Integer, ForeignKey("job.id"), primary_key=True)
     salary_from = Column(BigInteger)
     salary_to = Column(BigInteger)
+    salary_from_usd = Column(Numeric(12, 2))
+    salary_to_usd = Column(Numeric(12, 2))
     currency = Column(Text, nullable=False)
 
     # Relationships

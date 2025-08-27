@@ -1,3 +1,4 @@
 .astro/test_dag_integrity_default.py
 __pycache__/
 .tests/
+.env

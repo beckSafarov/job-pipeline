@@ -33,7 +33,7 @@ from utils.db_utils import query_jobs_published_in_june, query_jobs_published_in
     tags=["hh", "vacancies"],  # add tags in the UI
     is_paused_upon_creation=True,  # DAG will be paused when created - prevents auto-running
 )
-def hh_vacancies():
+def hh_vacancies_update():
 
     @task
     def fetch_latest_publication():
@@ -209,12 +209,12 @@ def hh_vacancies():
     # published_at = "2025-05-11T03:42:00"
 
     # basic_vacancies_path = fetch_basic_vacancies(published_at)
-    # basic_vacancies_path = fetch_vacs_for_july()
-    # path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
-    # paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
-    # print_test(paths_to_tables)
-    # load_to_db(paths_to_tables)
+    basic_vacancies_path = fetch_vacs_for_july()
+    path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
+    paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
+    print_test(paths_to_tables)
+    load_to_db(paths_to_tables)
 
 
 # Instantiate the DAG
-hh_vacancies()
+# hh_vacancies_update()

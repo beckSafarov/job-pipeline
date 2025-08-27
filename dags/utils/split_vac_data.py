@@ -1,3 +1,5 @@
+from utils.currency_utils import convert_to_usd
+
 def handle_work_format(formats: list) -> str:
     if len(formats) < 1:
         return formats
@@ -81,12 +83,24 @@ def build_languages_data(vacancy: dict) -> list:
 
 def build_salaries_data(vacancy: dict) -> dict:
     # Handle both API data (with nested salary) and database data (flat structure)
+
+    def get_usd_value(amount, currency):
+        if amount is None or currency is None:
+            return None
+        return convert_to_usd(amount, currency)
+
     if "salary" in vacancy and vacancy["salary"] is not None:
         # API data structure
         salary_data = {
             "salary_from": vacancy["salary"]["from"],
             "salary_to": vacancy["salary"]["to"],
             "currency": vacancy["salary"]["currency"],
+            "salary_from_usd": get_usd_value(
+                vacancy["salary"]["from"], vacancy["salary"]["currency"]
+            ),
+            "salary_to_usd": get_usd_value(
+                vacancy["salary"]["to"], vacancy["salary"]["currency"]
+            ),
         }
         return salary_data
     else:

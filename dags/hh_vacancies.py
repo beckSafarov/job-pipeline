@@ -128,9 +128,6 @@ def hh_vacancies():
         insert_to_table("Employer", employers)
         job_ids = insert_to_table("Job", jobs)
 
-        print("addresses:")
-        print(addresses)
-
         # Use job_id instead of source_id for related tables
         salaries_with_ids = prep_dict_lists(job_ids, salaries, id_column="job_id")
         addresses_with_ids = prep_dict_lists(job_ids, addresses, id_column="job_id")
@@ -180,10 +177,12 @@ def hh_vacancies():
             get_files_from_paths(paths)
         )
         print(jobs)
+        print(job_skills)
+        print(salaries)
         return salaries
 
-    # published_at = fetch_latest_publication()
-    published_at = "2025-05-11T03:42:00"
+    published_at = fetch_latest_publication()
+    # published_at = "2025-05-11T03:42:00"
     basic_vacancies_path = fetch_basic_vacancies(published_at)
     path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
     paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)
