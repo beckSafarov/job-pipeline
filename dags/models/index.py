@@ -1,4 +1,4 @@
-from sqlalchemy import (  #type: ignore
+from sqlalchemy import (  # type: ignore
     Column,
     Integer,
     String,
@@ -8,7 +8,8 @@ from sqlalchemy import (  #type: ignore
     DateTime,
     ForeignKey,
     Float,
-    Numeric
+    Numeric,
+    Identity,
 )
 from sqlalchemy.orm import relationship #type:ignore
 from sqlalchemy.ext.declarative import declarative_base #type:ignore
@@ -164,6 +165,51 @@ class Salary(Base):
 
     def __repr__(self):
         return f"<Salary(job_id={self.job_id}, salary_from={self.salary_from}, salary_to={self.salary_to}, currency='{self.currency}')>"
+
+
+class JobProcessed(Base):
+    __tablename__ = "job_processed"
+
+    job_id = Column(Integer, Identity(), primary_key=True)
+    created_at = Column(DateTime, nullable=False, server_default="now()")
+    description = Column(Text)
+    role_id = Column(Integer, ForeignKey("roles.id"))
+
+    # Relationships
+    job = relationship("Job")
+    role = relationship("Role")
+
+    def __repr__(self):
+        return f"<JobProcessed(job_id={self.job_id}, role_id={self.role_id})>"
+
+
+class ExtractedTag(Base):
+    __tablename__ = "extracted_tags"
+
+    job_id = Column(Integer, ForeignKey("job.id"), primary_key=True)
+    created_at = Column(DateTime, nullable=False, server_default="now()")
+    tag = Column(Text, primary_key=True, nullable=False)
+
+    # Relationships
+    job = relationship("Job")
+
+    def __repr__(self):
+        return f"<ExtractedTag(job_id={self.job_id}, tag='{self.tag}')>"
+
+
+class ExtractedSkill(Base):
+    __tablename__ = "extracted_skills"
+
+    job_id = Column(Integer, Identity(), primary_key=True)
+    created_at = Column(DateTime, nullable=False, server_default="now()")
+    skill = Column(Text, primary_key=True, nullable=False)
+    skill_type = Column(String)
+
+    # Relationships
+    job = relationship("Job")
+
+    def __repr__(self):
+        return f"<ExtractedSkill(job_id={self.job_id}, skill='{self.skill}', skill_type='{self.skill_type}')>"
 
 
 engine = get_db_engine()
