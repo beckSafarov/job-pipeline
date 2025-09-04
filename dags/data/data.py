@@ -28,6 +28,7 @@ roles = [
 
 model_pks = {
     "JobLanguage": ["job_id", "lang_id"],
+    "JobProcessed": ["job_id"],
     "JobRole": ["job_id", "role_id"],
     "JobSkill": ["job_id", "skill_name"],
     "Job": ["source_id"],

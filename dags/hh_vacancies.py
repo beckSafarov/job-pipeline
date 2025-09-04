@@ -116,9 +116,16 @@ def hh_vacancies():
             print("Paths is empty")
             return 
 
-        jobs, employers, addresses, salaries, job_languages, job_roles, job_skills = (
-            get_files_from_paths(paths)
-        )
+        (
+            jobs,
+            jobs_processed,
+            employers,
+            addresses,
+            salaries,
+            job_languages,
+            job_roles,
+            job_skills,
+        ) = get_files_from_paths(paths)
 
         # Debug: Print data structure before insertion
         print("Sample job data:", jobs[:1] if jobs else "No jobs")
@@ -129,6 +136,9 @@ def hh_vacancies():
         job_ids = insert_to_table("Job", jobs)
 
         # Use job_id instead of source_id for related tables
+        processed_jobs_with_ids = prep_dict_lists(
+            job_ids, jobs_processed, id_column="job_id"
+        )
         salaries_with_ids = prep_dict_lists(job_ids, salaries, id_column="job_id")
         addresses_with_ids = prep_dict_lists(job_ids, addresses, id_column="job_id")
         job_roles_with_ids = prep_nested_lists(job_ids, job_roles, id_column="job_id")
@@ -159,11 +169,16 @@ def hh_vacancies():
         )
 
         try:
-            insert_to_table("Address", addresses_with_ids)
-            insert_to_table("Salary", salaries_with_ids)
-            insert_to_table("JobLanguage", job_languages_with_ids)
-            insert_to_table("JobRole", job_roles_with_ids)
-            insert_to_table("JobSkill", job_skills_with_ids)
+            tables = {
+                "Address": addresses_with_ids,
+                "Salary": salaries_with_ids,
+                "JobProcessed": processed_jobs_with_ids,
+                "JobLanguage": job_languages_with_ids,
+                "JobRole": job_roles_with_ids,
+                "JobSkill": job_skills_with_ids,
+            }
+            for table_name, data in tables.items():
+                insert_to_table(table_name, data)
         except Exception as e:
             print(f"Error during insertion: {e}")
             raise

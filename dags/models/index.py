@@ -170,7 +170,7 @@ class Salary(Base):
 class JobProcessed(Base):
     __tablename__ = "job_processed"
 
-    job_id = Column(Integer, Identity(), primary_key=True)
+    job_id = Column(Integer, ForeignKey("job.id"), primary_key=True)
     created_at = Column(DateTime, nullable=False, server_default="now()")
     description = Column(Text)
     role_id = Column(Integer, ForeignKey("roles.id"))
@@ -200,7 +200,7 @@ class ExtractedTag(Base):
 class ExtractedSkill(Base):
     __tablename__ = "extracted_skills"
 
-    job_id = Column(Integer, Identity(), primary_key=True)
+    job_id = Column(Integer, ForeignKey("job.id"), primary_key=True)
     created_at = Column(DateTime, nullable=False, server_default="now()")
     skill = Column(Text, primary_key=True, nullable=False)
     skill_type = Column(String)

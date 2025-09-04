@@ -1,5 +1,16 @@
 from utils.currency_utils import convert_to_usd
 
+import re  # for regex operations
+
+
+def clean_description(text: str) -> str:
+    # Remove HTML tags
+    clean = re.sub(r"<[^>]+>", " ", text)
+    # Collapse multiple spaces into one
+    clean = re.sub(r"\s+", " ", clean).strip()
+    return clean
+
+
 def handle_work_format(formats: list) -> str:
     if len(formats) < 1:
         return formats
@@ -142,12 +153,25 @@ def build_job_skills_data(vacancy: dict) -> list:
     return job_skills_data
 
 
+def build_job_processed(vacancy: dict) -> list:
+    def get_pro_role(vacancy: dict) -> str:
+        if "professional_roles" in vacancy and vacancy["professional_roles"]:
+            return vacancy["professional_roles"][0]["id"]
+        return None
+
+    return {
+        "description": clean_description(vacancy.get("description", "")),
+        "role_id": get_pro_role(vacancy),
+    }
+
+
 def split_vac_data(vacancies: list) -> None:
     """splits the data from the vacancies list into separate lists for each table
     Args:
         vacancies (list): list of job posts
     """
     jobs = []
+    jobs_processed = []
     employers = []
     addresses = []
     languages = []
@@ -157,9 +181,10 @@ def split_vac_data(vacancies: list) -> None:
     # Extracting and transforming data
 
     for vacancy in vacancies:
-
         job_data = build_job_data(vacancy)
         jobs.append(job_data)
+        job_processed = build_job_processed(vacancy)
+        jobs_processed.append(job_processed)
         employer_data = build_employer_data(vacancy)
         employers.append(employer_data)
         address_data = build_address_data(vacancy)
@@ -175,11 +200,12 @@ def split_vac_data(vacancies: list) -> None:
         job_skills.append(job_skills_data)
 
     return {
-      "jobs":jobs,
-      "employers": employers,
-      "addresses": addresses,
-      "salaries": salaries,
-      "job_languages": languages,
-      "job_roles": job_roles,
-      "job_skills": job_skills
+        "jobs": jobs,
+        "jobs_processed": jobs_processed,
+        "employers": employers,
+        "addresses": addresses,
+        "salaries": salaries,
+        "job_languages": languages,
+        "job_roles": job_roles,
+        "job_skills": job_skills,
     }

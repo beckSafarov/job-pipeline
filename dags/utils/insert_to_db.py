@@ -1,4 +1,13 @@
-from models.index import Job,Employer,Address,Salary,JobLanguage,JobRole,JobSkill
+from models.index import (
+    Job,
+    Employer,
+    Address,
+    Salary,
+    JobLanguage,
+    JobRole,
+    JobSkill,
+    JobProcessed,
+)
 from utils.db_utils import create_session
 from sqlalchemy.dialects.postgresql import insert  # type:ignore
 from data.data import model_pks
@@ -6,12 +15,13 @@ from data.data import model_pks
 
 models_lookup = {
     "Employer": Employer,
-    "Job":Job,
-    "Address":Address,
-    "Salary":Salary,
-    "JobLanguage":JobLanguage,
-    "JobRole":JobRole,
-    "JobSkill":JobSkill,
+    "JobProcessed": JobProcessed,
+    "Job": Job,
+    "Address": Address,
+    "Salary": Salary,
+    "JobLanguage": JobLanguage,
+    "JobRole": JobRole,
+    "JobSkill": JobSkill,
 }
 
 
@@ -68,7 +78,6 @@ def insert_to_table(model_name: str, data: list) -> list | None:
         # print("Jobs data passed to insert_to_table:")
         # print(data)
         return []
-
     if model_name == "Job":
         job_ids = insert_new_job(data)
         # print("Job ids from insert_new_job method")
