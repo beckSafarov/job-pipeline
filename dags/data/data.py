@@ -26,6 +26,64 @@ roles = [
     {"name": "technical-writer", "id": 126},
 ]
 
+processed_roles = [
+    {"name": "devops", "id": 160},
+    {"name": "analyst", "id": 10},
+    {"name": "art-director", "id": 12},
+    {"name": "business-analyst", "id": 150},
+    {"name": "game-designer", "id": 25},
+    {"name": "data-scientist", "id": 165},
+    {"name": "designer", "id": 34},
+    {"name": "cio", "id": 36},
+    {"name": "product-manager", "id": 73},
+    {"name": "methodologist", "id": 155},
+    {"name": "programmer", "id": 96},
+    {"name": "product-analyst", "id": 164},
+    {"name": "dev-team-lead", "id": 104},
+    {"name": "analytics-head", "id": 157},
+    {"name": "project-manager", "id": 107},
+    {"name": "network-engineer", "id": 112},
+    {"name": "system-admin", "id": 113},
+    {"name": "system-analyst", "id": 148},
+    {"name": "system-engineer", "id": 114},
+    {"name": "security-specialist", "id": 116},
+    {"name": "support-specialist", "id": 121},
+    {"name": "tester", "id": 124},
+    {"name": "cto", "id": 125},
+    {"name": "technical-writer", "id": 126},
+    # newly added
+    {"name": "data-engineer", "id": 1000},
+    {"name": "ml-engineer", "id": 1001},
+    {"name": "mlops", "id": 1002},
+    {"name": "db-admin", "id": 1003},
+    {"name": "prompt-engineer", "id": 1004},
+]
+
+# job post -> programmer -> mobile_dev -> Flutter
+# job post -> analyst -> sales_analyst -> {skills: [SAP, Excel, ...], reqs: [higher_education/bachelors/masters, russian_c1, analytical_thinking, stress_handling]
+# job post -> db-admin -> Postgres,
+
+# skills = [ {id: 1, name: "SAP", type: "hard"}, {id: 2, name: "analytical_thinking", type: "soft"}, {id: 3, "stress_handling", type: 'soft'}]
+
+tags = [
+    "Higher Education",
+    "Frontend Developer",
+    "Backend Engineer",
+    "FullStack Engineer" "Mobile Engineer",
+    "Data Engineer",
+    "Embedded Engineer",
+    "UI/UX Designer",
+    "Graphic Designer",
+    "Sales Analyst",
+    "Product Analyst",
+    "Marketing Analyst",
+    "BI Analyst",
+    "Financial Analyst",
+    "Machine Learning Engineer",
+    "ML Ops",
+]
+
+
 model_pks = {
     "JobLanguage": ["job_id", "lang_id"],
     "JobProcessed": ["job_id"],

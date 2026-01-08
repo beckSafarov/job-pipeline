@@ -8,9 +8,11 @@ from models.index import (
     JobSkill,
     JobProcessed,
 )
-from utils.db_utils import create_session
+from utils.db_utils import create_session, execute_with_retry
 from sqlalchemy.dialects.postgresql import insert  # type:ignore
+from sqlalchemy.exc import OperationalError  # type:ignore
 from data.data import model_pks
+import time
 
 
 models_lookup = {
@@ -72,43 +74,54 @@ def insert_new_job(data: list) -> list:
 
 def insert_to_table(model_name: str, data: list) -> list | None:
     if data is None:
-        # print(f"No data for {model_name}")
         return []
     if len(data) < 1:
-        # print("Jobs data passed to insert_to_table:")
-        # print(data)
         return []
     if model_name == "Job":
         job_ids = insert_new_job(data)
-        # print("Job ids from insert_new_job method")
-        # print(job_ids)
         return job_ids
-    print(f"Running {model_name}")
-    session = create_session()
-    model_class = models_lookup[model_name]
 
-    try:
-        # Process all items in a single transaction
-        for item in data:
-            stmt = (
-                insert(model_class)
-                .values(**item)
-                .on_conflict_do_nothing(index_elements=model_pks[model_name])
-                .returning(
-                    model_class.id
-                    if model_name in ["Job", "Employer"]
-                    else model_class.job_id
+    print(f"Running {model_name} - inserting {len(data)} records")
+
+    # Process in batches to avoid connection timeouts
+    batch_size = 50  # Reduced from 100 for more frequent commits
+    total_batches = (len(data) + batch_size - 1) // batch_size
+
+    for batch_num in range(total_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(data))
+        batch_data = data[start_idx:end_idx]
+
+        print(
+            f"  Processing batch {batch_num + 1}/{total_batches} ({len(batch_data)} records)"
+        )
+
+        # Use the retry wrapper
+        def process_batch(session):
+            model_class = models_lookup[model_name]
+
+            for item in batch_data:
+                stmt = (
+                    insert(model_class)
+                    .values(**item)
+                    .on_conflict_do_nothing(index_elements=model_pks[model_name])
+                    .returning(
+                        model_class.id
+                        if model_name in ["Job", "Employer"]
+                        else model_class.job_id
+                    )
                 )
-            )
-            session.execute(stmt)
+                session.execute(stmt)
 
-        # Flush and commit only once after processing all items
-        session.flush()
-        session.commit()
-        return None
+            session.commit()
+            return True
 
-    except Exception as e:
-        session.rollback()
-        raise e
-    finally:
-        session.close()
+        try:
+            execute_with_retry(process_batch, max_retries=5, initial_wait=2)
+            print(f"  ✓ Batch {batch_num + 1} committed successfully")
+        except Exception as e:
+            print(f"  ❌ Failed to insert batch {batch_num + 1} after all retries: {e}")
+            raise
+
+    print(f"✅ {model_name} insertion complete")
+    return None

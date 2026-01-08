@@ -6,7 +6,7 @@ from pendulum import datetime, duration #type: ignore
 from utils.hh_api import get_vacancy_details, get_latest_vacancies  # type: ignore
 from utils.split_vac_data import split_vac_data
 import time  # type: ignore
-from dags.utils.insert_to_db import insert_to_table
+from utils.insert_to_db import insert_to_table
 from utils.common_utils import (
     get_files_from_paths,
     get_json,
@@ -39,6 +39,7 @@ def hh_vacancies():
     def fetch_latest_publication():
         latest_vacancy = query_latest_vacancy()
         published_at = latest_vacancy.get("published_at", {}).isoformat()
+        print("published_at: ", published_at)
         return published_at
 
     @task
@@ -57,11 +58,45 @@ def hh_vacancies():
             list[dict]: A list of vacancies currently available at HH.
         """
         role_ids = [role["id"] for role in roles]
-        # role_ids = [125]
+        # TEST: Start with just 2-3 role IDs to identify the problematic one
+        # role_ids = [156, 96]  # Add one more role ID to test
         all_vacancies = []
+
+        print(f"🔍 DEBUG: Fetching vacancies for {len(role_ids)} role(s)")
+
         for role_id in role_ids:
+            print(f"📋 Fetching vacancies for role_id: {role_id}")
             role_vacs = get_latest_vacancies(published_at, role_id)
+            print(f"   ✓ Got {len(role_vacs)} vacancies for role {role_id}")
+
+            # Check structure of first vacancy
+            if role_vacs:
+                first_vac = role_vacs[0]
+                print(f"   📊 Sample vacancy keys: {list(first_vac.keys())}")
+                print(f"   🔑 Has 'id' key: {'id' in first_vac}")
+                if "id" not in first_vac:
+                    print(f"   ⚠️ WARNING: Vacancy missing 'id' key! Data: {first_vac}")
+
+            # Validate all vacancies before adding
+            invalid_count = 0
+            for i, vac in enumerate(role_vacs):
+                if not isinstance(vac, dict):
+                    print(f"   ❌ Vacancy {i} is not a dict: {type(vac)}")
+                    invalid_count += 1
+                elif "id" not in vac:
+                    print(
+                        f"   ❌ Vacancy {i} missing 'id' key. Keys: {list(vac.keys())}"
+                    )
+                    invalid_count += 1
+
+            if invalid_count > 0:
+                print(
+                    f"   ⚠️ Role {role_id}: {invalid_count}/{len(role_vacs)} invalid vacancies detected"
+                )
+
             all_vacancies.extend(role_vacs)
+
+        print(f"✅ Total vacancies collected: {len(all_vacancies)}")
         file_path = "/tmp/vacancies.json"
         write_json(all_vacancies, file_path)
         return file_path
@@ -70,7 +105,16 @@ def hh_vacancies():
     def fetch_detailed_vacancies(path: str) -> str:
         vacancies = get_json(path)
 
-        for vacancy in vacancies:   
+        print(f"🔍 DEBUG: Processing {len(vacancies)} vacancies for details")
+
+        for i, vacancy in enumerate(vacancies):
+            # Debug: Check if vacancy has 'id' key
+            if "id" not in vacancy:
+                print(f"❌ ERROR: Vacancy at index {i} missing 'id' key!")
+                print(f"   Available keys: {list(vacancy.keys())}")
+                print(f"   Data: {vacancy}")
+                continue  # Skip this vacancy
+
             vacancy_id = vacancy["id"]
             vacancy_details = get_vacancy_details(vacancy_id)
             if vacancy_details:
@@ -101,7 +145,39 @@ def hh_vacancies():
             print("No vacancies found.")
             return
 
-        tables = split_vac_data(vacancies)
+        print(f"🔍 DEBUG: Transform - Processing {len(vacancies)} vacancies")
+
+        # Print structure of first vacancy for debugging
+        if vacancies:
+            print("📊 Sample vacancy structure (first vacancy):")
+            first_vac = vacancies[0]
+            print(f"   Top-level keys: {list(first_vac.keys())}")
+            print(f"   area: {first_vac.get('area')}")
+            print(f"   employer: {first_vac.get('employer')}")
+            print(f"   schedule: {first_vac.get('schedule')}")
+            print(f"   work_format: {first_vac.get('work_format')}")
+            print(f"   working_hours: {first_vac.get('working_hours')}")
+            print(f"   employment_form: {first_vac.get('employment_form')}")
+            print(f"   experience: {first_vac.get('experience')}")
+
+        # Validate each vacancy before processing
+        for i, vac in enumerate(vacancies):
+            if not isinstance(vac, dict):
+                print(f"❌ Vacancy {i} is not a dict: {type(vac)}")
+            elif "id" not in vac:
+                print(f"❌ Vacancy {i} missing 'id' key!")
+                print(f"   Available keys: {list(vac.keys())}")
+                print(f"   Sample data: {str(vac)[:200]}...")
+
+        # print("vacancies below")
+        # print(vacancies)
+
+        try:
+            tables = split_vac_data(vacancies)
+        except KeyError as e:
+            print(f"❌ KeyError in split_vac_data: {e}")
+            print(f"   This likely means a vacancy is missing the '{e.args[0]}' key")
+            raise
         paths = []
 
         for table_name in tables.keys():
@@ -167,6 +243,14 @@ def hh_vacancies():
                 else "No job roles"
             ),
         )
+        print(
+            "Job skills count:",
+            len(job_skills_with_ids) if job_skills_with_ids else 0,
+        )
+        print(
+            "Job skills sample:",
+            job_skills_with_ids[:3] if job_skills_with_ids else "No job skills",
+        )
 
         try:
             tables = {
@@ -178,6 +262,9 @@ def hh_vacancies():
                 "JobSkill": job_skills_with_ids,
             }
             for table_name, data in tables.items():
+                print(
+                    f"\n📊 Inserting {len(data) if data else 0} records into {table_name}"
+                )
                 insert_to_table(table_name, data)
         except Exception as e:
             print(f"Error during insertion: {e}")
@@ -197,7 +284,7 @@ def hh_vacancies():
         return salaries
 
     published_at = fetch_latest_publication()
-    # published_at = "2025-05-11T03:42:00"
+    # published_at = "2025-09-10T00:00:00"
     basic_vacancies_path = fetch_basic_vacancies(published_at)
     path_to_detailed_vacancies_file = fetch_detailed_vacancies(basic_vacancies_path)
     paths_to_tables = transform_and_split_data(path_to_detailed_vacancies_file)

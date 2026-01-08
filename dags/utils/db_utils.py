@@ -1,19 +1,102 @@
 from airflow.providers.postgres.hooks.postgres import PostgresHook  # type:ignore
 from sqlalchemy.orm import sessionmaker, noload  # type:ignore
-from sqlalchemy import select, extract  # type:ignore
+from sqlalchemy import select, extract, event  # type:ignore
+from sqlalchemy.pool import Pool  # type:ignore
+from sqlalchemy.exc import OperationalError  # type:ignore
 import json
 from decimal import Decimal
 from datetime import datetime
+import time
 
 def get_db_engine():
     hook = PostgresHook(postgres_conn_id="supabase_db")
-    return hook.get_sqlalchemy_engine()
+
+    # Get engine with proper connection arguments
+    connect_args = {
+        "connect_timeout": 10,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    }
+
+    engine = hook.get_sqlalchemy_engine()
+
+    # Configure connection pool for better stability
+    engine.pool._max_overflow = 10
+    engine.pool._pool_size = 5
+
+    # Set connection pool recycle time to prevent stale connections (10 minutes)
+    # Reduced from 25 min to be more aggressive
+    engine.pool._recycle = 600
+
+    # Enable pre-ping to check connection health before using
+    engine.pool._pre_ping = True
+
+    return engine
 
 
 def create_session():
     engine = get_db_engine()
     Session = sessionmaker(bind=engine)
     return Session()
+
+
+def execute_with_retry(func, max_retries=3, initial_wait=1):
+    """
+    Execute a database function with automatic retry on connection errors.
+
+    Args:
+        func: A function that takes a session as argument and performs DB operations
+        max_retries: Maximum number of retry attempts
+        initial_wait: Initial wait time in seconds (doubles with each retry)
+
+    Returns:
+        Result from the function
+
+    Example:
+        def my_insert(session):
+            session.execute(stmt)
+            session.commit()
+
+        execute_with_retry(my_insert)
+    """
+    last_error = None
+
+    for attempt in range(max_retries):
+        session = create_session()
+        try:
+            result = func(session)
+            session.close()
+            return result
+
+        except OperationalError as e:
+            session.rollback()
+            session.close()
+            last_error = e
+
+            error_str = str(e)
+            is_connection_error = any(
+                keyword in error_str.lower()
+                for keyword in ["ssl", "eof", "connection", "timeout", "broken pipe"]
+            )
+
+            if is_connection_error and attempt < max_retries - 1:
+                wait_time = initial_wait * (2**attempt)
+                print(f"⚠️ Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"⏳ Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            else:
+                raise
+
+        except Exception as e:
+            session.rollback()
+            session.close()
+            raise
+
+    # If we get here, all retries failed
+    raise last_error
 
 
 def convert_to_serializable(obj):
